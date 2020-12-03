@@ -1,5 +1,6 @@
 # author: Guowei Li
 import os
+import sqlite3
 from typing import Tuple, List, Iterator, Dict, DefaultDict
 from prettytable import PrettyTable
 
@@ -44,6 +45,7 @@ class repository:
         ptm: PrettyTable = PrettyTable(field_names= ["Major","Required Courses","Electives"]) # initialize a prettytable for majors
         pts: PrettyTable = PrettyTable(field_names = ["CWID","Name","major","Completed Course","Remaining Required","Remaining Electives","GPA"]) # initialize a prettytable for students
         pti: PrettyTable = PrettyTable(field_names = ["CWID","Name","Dept","Course","Students"]) # initialize a prettytable for instuctors
+        ptsg: PrettyTable = PrettyTable(field_names= ["Name","CWID","Course","Grade","Instructor"])
 
         """stores all the courses requirement in different majors"""
         fp = self.file_reader(os.path.join(self.dirpath,'majors.txt'),3,'\t',True)
@@ -58,21 +60,21 @@ class repository:
                 self.majorList[i[0]]["Electives"].append(i[2])
 
         """store all the students"""
-        fp = self.file_reader(os.path.join(self.dirpath,'students.txt'),3,';',True)
+        fp = self.file_reader(os.path.join(self.dirpath,'students.txt'),3,'\t',True)
         for i in fp:
             self.studentList.append(student(i[0],i[1],i[2]))# Read the students.txt file, creating a new instance of class Student for each line in the file, and add the new Student to the repository's container with all students.
         """store all the instructors"""
-        fp = self.file_reader(os.path.join(self.dirpath,'instructors.txt'),3,'|',True)
+        fp = self.file_reader(os.path.join(self.dirpath,'instructors.txt'),3,'\t',True)
         for i in fp:
             self.instructorList.append(instructor(i[0],i[1],i[2])) # Read the instructors.txt file, creating a new instance of class Instructor for each line in the file, and add the new Instructor to the repository's container with all Instructors.
         
         """"store all the grades"""
-        fp = self.file_reader(os.path.join(self.dirpath,'grades.txt'),4,'|',True)
+        fp = self.file_reader(os.path.join(self.dirpath,'grades.txt'),4,'\t',True)
         for i in fp:
             for s in self.studentList:
                 if i[0] == s.cwid:
                     s.addCourseGrade(i[1],i[2]) # Use the student cwid, course, and grade and ask the instance of class Student associated the student cwid to add the grade to the student information
-        fp = self.file_reader(os.path.join(self.dirpath,'grades.txt'),4,'|',True)
+        fp = self.file_reader(os.path.join(self.dirpath,'grades.txt'),4,'\t',True)
         for i in fp:
             for s in self.instructorList:
                 if i[3] == s.cwid:
@@ -100,12 +102,18 @@ class repository:
         for i in self.instructorList:
             for c in i.summary.keys():
                 pti.add_row([i.cwid,i.name,i.department, c,i.summary[c]])# add row for each instructor in the repository and each instructor might have more than one course teaching
+        DB_FILE: str = os.path.join(os.getcwd(),"HW11_Guowei_Li.bd")
+        for i in self.student_grades_table_db(DB_FILE):
+            ptsg.add_row(i)
+
         print("Majors Summary")
         print(ptm) # print a major prettytable
         print("Student Summary")
         print(pts) # print a student prettytable
         print("Instructor Summary")
         print(pti) # print an instructor prettytable
+        print("Student Grade Summary")
+        print(ptsg) # print a student grade prettytable
 
     def file_reader(self, path: str, field: int, sep: str, header: bool) -> Iterator[List[str]]:
         """THis functino a file reading helper that read every line in the file and seperate by the sep"""
@@ -129,7 +137,13 @@ class repository:
                         raise ValueError(f"the fileds of line {counter} in {path} is not equal to {field}") # show which line has different field
                     counter += 1
                     yield line
-
+    def student_grades_table_db(self, db_path: str) -> Iterator:
+        bd: sqlite3.Connection = sqlite3.connect(db_path)
+        query: str = """select students.Name, students.CWID, Course, Grade, instructors.Name 
+                        from students join grades on students.CWID = grades.StudentCWID join instructors on grades.InstructorCWID = instructors.CWID 
+                        order by students.Name"""
+        for row in bd.execute(query):
+            yield row
 def main():
     """please change the path at the main other wise the system wont work"""
     path = os.getcwd()
